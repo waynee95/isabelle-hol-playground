@@ -148,4 +148,18 @@ lemma "(\<not>(A \<or> B)) = (\<not>A \<and> \<not>B)"
   apply assumption
   done  
 
+lemma "p \<and> q \<longleftrightarrow> q \<and> p"
+  apply (rule iffI)
+   apply (rule conjI)
+    apply (erule conjE)
+    apply (assumption)
+   apply (erule conjE)
+   apply (assumption)
+  apply (rule conjI)
+   apply (erule conjE)
+   apply (assumption)
+  apply (erule conjE)
+  apply (assumption)
+  done
+
 end
