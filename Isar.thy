@@ -51,5 +51,23 @@ proof
 
 lemma "A \<and> B \<longleftrightarrow> B \<and> A"
   by auto
- 
+
+lemma "(\<forall>x. P x) \<longrightarrow> (\<exists>x. P x)"
+proof
+  assume "\<forall>x. P x"
+  then show "\<exists>x. P x"
+  proof
+    fix x
+    assume "P x"
+    then show ?thesis ..
+  qed
+qed
+
+lemma "(\<forall>x. P x) \<longrightarrow> (\<exists>x. P x)"
+proof
+  assume "\<forall>x. P x"
+  then obtain x where "P x" ..
+  then show "\<exists>x. P x" ..
+qed
+
 end
