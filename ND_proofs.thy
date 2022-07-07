@@ -109,4 +109,17 @@ proof (rule impI)
   qed
 qed
 
+thm impI
+thm impI [of "A \<and> B" "B \<and> A"]
+
+lemma "A \<and> B \<longrightarrow> B \<and> A"
+proof (rule impI [of "A \<and> B" "B \<and> A"])
+  assume "A \<and> B"
+  then show "B \<and> A"
+  proof (rule conjE [of A B "B \<and> A"])
+    assume B A
+    then show ?thesis by (rule conjI [of B A])
+  qed
+qed
+
 end
