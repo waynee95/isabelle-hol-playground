@@ -271,9 +271,8 @@ lemma rep_any_spec:
   assumes "R \<in> regions_all vars \<sigma>"
   shows "rep_any vars \<sigma> R \<in> U\<sigma> vars \<sigma>
        \<and> membership_pattern vars \<sigma> (rep_any vars \<sigma> R) = R"
-  using assms unfolding active_regions_def rep_any_def
-  by (smt (verit) active_regions_def mem_Collect_eq regions_all_def
-      some_eq_ex)
+  using assms unfolding active_regions_def rep_any_def regions_all_def
+  by (metis (mono_tags, lifting) mem_Collect_eq)
 
 (* the set of all chosen representatives: one per region, 
   preferring non-constant witness when available *)
@@ -289,7 +288,7 @@ definition support :: "nat list \<Rightarrow> set_interp \<Rightarrow> elem_inte
 lemma rep_nc_in_support:
   assumes "has_nonconst_region vars \<sigma> \<iota> C R" "R \<in> regions_all vars \<sigma>"
   shows   "rep_nc vars \<sigma> \<iota> C R \<in> support vars \<sigma> \<iota> C"
-  using assms by (simp add: support_def reps_def) blast
+  using assms reps_def support_def by auto 
 
 lemma rep_nc_not_const:
   assumes "has_nonconst_region vars \<sigma> \<iota> C R"
@@ -324,9 +323,11 @@ lemma card_reps_le:
   defines "B  \<equiv> {r\<in>Rs. \<not> has_nonconst_region vars \<sigma> \<iota> C r}"
   shows "card (reps vars \<sigma> \<iota> C) \<le> card (regions_all vars \<sigma>)"
 proof -
+  (* A and B form a disjoint partition of Rs *)
   have part: "A \<union> B = Rs" and disj: "A \<inter> B = {}"
     unfolding A_def B_def Rs_def by auto
 
+  (* finiteness of the underlying region set, hence of A and B *)
   have finRs: "finite Rs"
     unfolding Rs_def by (rule finite_regions_all)
   have finA: "finite A" and finB: "finite B"
@@ -343,11 +344,13 @@ proof -
      = rep_any vars \<sigma> ` B"
     unfolding B_def by auto
 
+  (* reps is the union of both images *)
   have reps_img:
     "reps vars \<sigma> \<iota> C = (rep_nc vars \<sigma> \<iota> C ` A) \<union> (rep_any vars \<sigma> ` B)"
     unfolding reps_def Rs_def A_def B_def
     using A_def B_def Rs_def reps_A reps_B by auto
 
+  (* now bound the cardinality *)
   have "card (reps vars \<sigma> \<iota> C)
         = card ((rep_nc vars \<sigma> \<iota> C ` A) \<union> (rep_any vars \<sigma> ` B))"
     by (simp add: reps_img)
@@ -358,13 +361,12 @@ proof -
     using finA finB
     by (meson add_le_mono card_image_le)
   also have "\<dots> = card (A \<union> B)"
+  (* disjointness allows summing the sizes *)
     using finA finB disj by (simp add: card_Un_disjoint)
   also have "\<dots> = card Rs" using part by simp
   also have "\<dots> = card (regions_all vars \<sigma>)" by (simp add: Rs_def)
   finally show ?thesis .
 qed
-
-
 
 lemma finite_support:
   assumes "finite C"
@@ -395,17 +397,16 @@ lemma region_invariance:
     unfolding membership_pattern_def const_vals_def
     by (induction s) auto
 
+(* Non-constant witnesses live in the visible universe *)
 lemma nonconst_in_eval_set_in_U\<sigma>:
   assumes SV: "set_vars_set_expr s \<subseteq> set vars"
       and SC: "consts_set_expr s \<subseteq> C"
       and x_s: "x \<in> eval_set \<sigma> \<iota> s"
       and x_nonconst: "x \<notin> \<iota> ` C"
   shows "x \<in> U\<sigma> vars \<sigma>"
-    using assms
-    unfolding U\<sigma>_def
-    by (induction s) auto
+    using assms U\<sigma>_def by (induction s) auto
 
-(* the restricted evaluation always produces elements in D 
+(* The restricted evaluation always produces elements in D 
   once D contains all constant values *)
 lemma eval_set_restricted_subset_D:
   assumes SC: "consts_set_expr s \<subseteq> C"
@@ -422,6 +423,7 @@ next
     by (auto simp: const_vals_def) 
 qed auto
 
+(* All set values stay inside domain D *)
 lemma eval_set_restricted_subset_support:
   assumes D_def: "D = support vars \<sigma> \<iota> C"
       and SC:    "consts_set_expr s \<subseteq> C"
@@ -552,8 +554,7 @@ lemma seteq_preserved_by_support:
   assumes SCs: "consts_set_expr s \<subseteq> C"
   assumes SCt: "consts_set_expr t \<subseteq> C"
   shows "(eval_set \<sigma> \<iota> s = eval_set \<sigma> \<iota> t) = (eval_set \<sigma>' \<iota> s = eval_set \<sigma>' \<iota> t)"
-    using assms subset_preserved_by_support
-  by (metis set_eq_subset) 
+    using assms subset_preserved_by_support by (metis set_eq_subset) 
 
 (* Atomic preservation when restricting to the small support *)
 lemma atom_preserved_by_support:
