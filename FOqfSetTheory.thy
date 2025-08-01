@@ -453,7 +453,8 @@ lemma subset_preserved_by_support:
   assumes SCt: "consts_set_expr t \<subseteq> C"
   shows "(eval_set \<sigma> \<iota> s \<subseteq> eval_set \<sigma> \<iota> t) = (eval_set \<sigma>' \<iota> s \<subseteq> eval_set \<sigma>' \<iota> t)"
 proof
-  assume sub: "eval_set \<sigma> \<iota> s \<subseteq> eval_set \<sigma> \<iota> t"
+  (* If s \<subseteq> t under \<sigma>, then also under restriction \<sigma>' *)
+  assume H: "eval_set \<sigma> \<iota> s \<subseteq> eval_set \<sigma> \<iota> t"
   show "eval_set \<sigma>' \<iota> s \<subseteq> eval_set \<sigma>' \<iota> t"
   proof
     fix x assume xs': "x \<in> eval_set \<sigma>' \<iota> s"
@@ -466,57 +467,73 @@ proof
       using xD xs' by (simp add: \<sigma>'_def eval_set_on_D_agree)
         (* 3) Use the assumed subset under \<sigma> *)
     have xt: "x \<in> eval_set \<sigma> \<iota> t"
-      using sub xs by auto
+      using H xs by auto
         (* 4) Switch back to \<sigma>' using agreement on D *)
     have "(x \<in> eval_set \<sigma>' \<iota> t) = (x \<in> eval_set \<sigma> \<iota> t)"
       using xD by (simp add: \<sigma>'_def eval_set_on_D_agree)
     then show "x \<in> eval_set \<sigma>' \<iota> t" using xt by simp
   qed
 next
+  (* If s \<subseteq> t under \<sigma>', then also under \<sigma> *)
   assume H': "eval_set \<sigma>' \<iota> s \<subseteq> eval_set \<sigma>' \<iota> t"
   show "eval_set \<sigma> \<iota> s \<subseteq> eval_set \<sigma> \<iota> t"
+  (* Proof by contradiction: assume a counterexample exists under \<sigma> *)
   proof (rule ccontr)
     assume "\<not> eval_set \<sigma> \<iota> s \<subseteq> eval_set \<sigma> \<iota> t"
     then obtain x where xs: "x \<in> eval_set \<sigma> \<iota> s" and nxt: "x \<notin> eval_set \<sigma> \<iota> t" by auto
+    (* that element is either a constant from C, or not *)
     consider (Const) n where "n \<in> C" "x = \<iota> n"
            | (NonConst) "x \<notin> \<iota> ` C" by auto
     then obtain y where yD: "y \<in> D" and ys: "y \<in> eval_set \<sigma> \<iota> s" and nyt: "y \<notin> eval_set \<sigma> \<iota> t"
     proof cases
+      (* Constant case: constant values are included in D by _construction_ *)
       case Const
       then have "x \<in> D" by (simp add: D_def support_def const_vals_def)
       with xs nxt show ?thesis by (intro that[of x]) auto
     next
-       next
+      (* Non-constant case *)
       case NonConst
+      (* x is in the visible universe because s only uses the listed vars *)
       have xU: "x \<in> U\<sigma> vars \<sigma>"
         using nonconst_in_eval_set_in_U\<sigma>[OF SVs SCs xs NonConst] .
       let ?R = "membership_pattern vars \<sigma> x"
 
+      (* the region R is active (realized in the original model) *)
       have R_in: "?R \<in> regions_all vars \<sigma>"
         unfolding regions_all_def active_regions_def U\<sigma>_def
         using xU U\<sigma>_def by auto 
 
+      (* since x itself is non-constant, region R has a non-constant witness *)
       have has_nc: "has_nonconst_region vars \<sigma> \<iota> C ?R"
         unfolding has_nonconst_region_def U\<sigma>_def
         using xU NonConst U\<sigma>_def by auto
 
+      (* pick the designated non-constant representative of R, which is in D *)
       have rep_in_D: "rep_nc vars \<sigma> \<iota> C ?R \<in> D"
         using rep_nc_in_support[OF has_nc R_in] by (simp add: D_def)
 
+      (* this representative has the exact same membership pattern as x *)
       have same: "membership_pattern vars \<sigma> (rep_nc vars \<sigma> \<iota> C ?R) = membership_pattern vars \<sigma> x"
         using rep_nc_spec[OF has_nc] by simp
 
+      (* and is non-constant *)
       have rnC: "rep_nc vars \<sigma> \<iota> C ?R \<notin> \<iota> ` C"
         using rep_nc_not_const[OF has_nc] .
 
+      (* transport x's membership in s to the representative using 
+        region invariance *)
       have ys': "rep_nc vars \<sigma> \<iota> C ?R \<in> eval_set \<sigma> \<iota> s"
         by (metis NonConst SCs SVs const_vals_def region_invariance rnC same xs) 
 
+      (* transport x's non-membership in t *)
       have nyt': "rep_nc vars \<sigma> \<iota> C ?R \<notin> eval_set \<sigma> \<iota> t"
         by (metis NonConst SCt SVt const_vals_def nxt region_invariance rnC same)
 
+      (* package the representative as the desired y in D *)
       from rep_in_D ys' nyt' show ?thesis by (intro that)
     qed
+    (* agreement on D converts y into a _counterexample_ under \<sigma>', 
+      which contradicts assumption H' *)
     from yD have "y \<in> eval_set \<sigma>' \<iota> s"
       by (simp add: \<sigma>'_def eval_set_on_D_agree ys) 
     moreover from yD have "y \<notin> eval_set \<sigma>' \<iota> t"
