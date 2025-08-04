@@ -170,7 +170,7 @@ definition active_regions :: "nat list \<Rightarrow> set_interp \<Rightarrow> na
 (* the set of active regions is a subset over all possible regions *)
 lemma regions_subset_Pow:
   "active_regions vars \<sigma> U \<subseteq> Pow (set vars)"
-  unfolding active_regions_def membership_pattern_def by auto
+    using active_regions_def membership_pattern_def by auto
 
 (* hence, the number of active regions is finite *)
 lemma finite_regions: "finite (active_regions vars \<sigma> U)"
@@ -243,7 +243,7 @@ definition regions_all :: "nat list \<Rightarrow> set_interp \<Rightarrow> nat s
   "regions_all vars \<sigma> = active_regions vars \<sigma> (U\<sigma> vars \<sigma>)"
 
 lemma finite_regions_all: "finite (regions_all vars \<sigma>)"
-  unfolding regions_all_def by (rule finite_regions)
+  unfolding regions_all_def by (simp add: finite_regions)
 
 (* some regions may have elements not equal to any constant value *)
 definition has_nonconst_region :: "nat list \<Rightarrow> set_interp \<Rightarrow> elem_interp \<Rightarrow> nat set \<Rightarrow> nat set \<Rightarrow> bool" where
@@ -260,7 +260,7 @@ lemma rep_nc_spec:
   shows "rep_nc vars \<sigma> \<iota> C R \<in> U\<sigma> vars \<sigma>
        \<and> membership_pattern vars \<sigma> (rep_nc vars \<sigma> \<iota> C R) = R
        \<and> rep_nc vars \<sigma> \<iota> C R \<notin> \<iota> ` C"
-    using assms unfolding has_nonconst_region_def rep_nc_def
+      using assms unfolding has_nonconst_region_def rep_nc_def
     by (metis (mono_tags, lifting) some_eq_ex) 
 
 (* Fallback rep if a region has no non-const element *)
@@ -271,7 +271,7 @@ lemma rep_any_spec:
   assumes "R \<in> regions_all vars \<sigma>"
   shows "rep_any vars \<sigma> R \<in> U\<sigma> vars \<sigma>
        \<and> membership_pattern vars \<sigma> (rep_any vars \<sigma> R) = R"
-  using assms unfolding active_regions_def rep_any_def regions_all_def
+    using assms unfolding active_regions_def rep_any_def regions_all_def
   by (metis (mono_tags, lifting) mem_Collect_eq)
 
 (* the set of all chosen representatives: one per region, 
@@ -288,7 +288,7 @@ definition support :: "nat list \<Rightarrow> set_interp \<Rightarrow> elem_inte
 lemma rep_nc_in_support:
   assumes "has_nonconst_region vars \<sigma> \<iota> C R" "R \<in> regions_all vars \<sigma>"
   shows   "rep_nc vars \<sigma> \<iota> C R \<in> support vars \<sigma> \<iota> C"
-  using assms reps_def support_def by auto 
+  using assms unfolding reps_def support_def by auto 
 
 lemma rep_nc_not_const:
   assumes "has_nonconst_region vars \<sigma> \<iota> C R"
@@ -308,7 +308,7 @@ proof -
   have "\<exists>u\<in>U\<sigma> vars \<sigma>. membership_pattern vars \<sigma> u = R"
     using assms unfolding regions_all_def active_regions_def by auto
   then show ?thesis
-    using rep_of_def
+      using rep_of_def
     by (metis (mono_tags, lifting) some_eq_ex)
 qed
 
@@ -329,7 +329,7 @@ proof -
 
   (* finiteness of the underlying region set, hence of A and B *)
   have finRs: "finite Rs"
-    unfolding Rs_def by (rule finite_regions_all)
+    unfolding Rs_def by (simp add: finite_regions_all)
   have finA: "finite A" and finB: "finite B"
     using finRs unfolding A_def B_def by auto
 
@@ -347,24 +347,21 @@ proof -
   (* reps is the union of both images *)
   have reps_img:
     "reps vars \<sigma> \<iota> C = (rep_nc vars \<sigma> \<iota> C ` A) \<union> (rep_any vars \<sigma> ` B)"
-    unfolding reps_def Rs_def A_def B_def
-    using A_def B_def Rs_def reps_A reps_B by auto
+    unfolding reps_def Rs_def A_def B_def using reps_A reps_B by auto
 
   (* now bound the cardinality *)
   have "card (reps vars \<sigma> \<iota> C)
         = card ((rep_nc vars \<sigma> \<iota> C ` A) \<union> (rep_any vars \<sigma> ` B))"
     by (simp add: reps_img)
   also have "\<dots> \<le> card (rep_nc vars \<sigma> \<iota> C ` A) + card (rep_any vars \<sigma> ` B)"
-    using finA finB
-    using card_Un_le by auto
+    using finA finB card_Un_le by auto
   also have "\<dots> \<le> card A + card B"
-    using finA finB
-    by (meson add_le_mono card_image_le)
+    using finA finB by (auto simp add: add_le_mono card_image_le)
   also have "\<dots> = card (A \<union> B)"
   (* disjointness allows summing the sizes *)
     using finA finB disj by (simp add: card_Un_disjoint)
   also have "\<dots> = card Rs" using part by simp
-  also have "\<dots> = card (regions_all vars \<sigma>)" by (simp add: Rs_def)
+  also have "\<dots> = card (regions_all vars \<sigma>)" unfolding Rs_def by simp
   finally show ?thesis .
 qed
 
@@ -549,10 +546,10 @@ lemma seteq_preserved_by_support:
     and \<sigma> :: "set_interp" and \<iota> :: "elem_interp"
   defines "D \<equiv> support vars \<sigma> \<iota> C"
   defines "\<sigma>' \<equiv> restrict_set_interp D \<sigma>"
-  assumes SVs: "set_vars_set_expr s \<subseteq> set vars"
-  assumes SVt: "set_vars_set_expr t \<subseteq> set vars"
-  assumes SCs: "consts_set_expr s \<subseteq> C"
-  assumes SCt: "consts_set_expr t \<subseteq> C"
+  assumes "set_vars_set_expr s \<subseteq> set vars"
+    and "set_vars_set_expr t \<subseteq> set vars"
+    and "consts_set_expr s \<subseteq> C"
+    and "consts_set_expr t \<subseteq> C"
   shows "(eval_set \<sigma> \<iota> s = eval_set \<sigma> \<iota> t) = (eval_set \<sigma>' \<iota> s = eval_set \<sigma>' \<iota> t)"
     using assms subset_preserved_by_support by (metis set_eq_subset) 
 
@@ -594,23 +591,22 @@ lemma formula_preserved_by_support:
     and \<sigma> :: "set_interp" and \<iota> :: "elem_interp"
   defines "D \<equiv> support vars \<sigma> \<iota> C"
   defines "\<sigma>' \<equiv> restrict_set_interp D \<sigma>"
-  assumes Fvars: "set_vars f \<subseteq> set vars"
-  assumes Fc:    "consts_formula f \<subseteq> C"
+  assumes "set_vars f \<subseteq> set vars"
+    and "consts_formula f \<subseteq> C"
   shows "eval_formula \<sigma> \<iota> f = eval_formula \<sigma>' \<iota> f"
-  using Fvars Fc
+  using assms
 proof (induction f)
   case (Atom a)
   then show ?case
-      unfolding D_def \<sigma>'_def 
-    by (metis atom_preserved_by_support consts_formula.simps(1) eval_formula.simps(1)
-        set_vars.simps(1))
+     using atom_preserved_by_support
+    by (metis consts_formula.simps(1) eval_formula.simps(1) set_vars.simps(1)) 
 qed auto
 
 (* --- The small-model theorem and the size bound --- *)
 
 lemma card_regions_all_le:
   "card (regions_all vars \<sigma>) \<le> 2 ^ length vars"
-  unfolding regions_all_def by (rule card_regions_le)
+  unfolding regions_all_def by (simp add: card_regions_le)
 
 (* counting representatives + all constant values yields final bound *)
 lemma card_support_bound:
@@ -620,7 +616,7 @@ lemma card_support_bound:
 proof -
   have "card (support vars \<sigma> \<iota> C)
         \<le> card (\<iota> ` C) + card (regions_all vars \<sigma>)"
-    unfolding support_def const_vals_def
+      unfolding support_def const_vals_def
     by (meson card_Un_le card_reps_le le_trans nat_add_left_cancel_le)
   also have "\<dots> \<le> card (\<iota> ` C) + 2 ^ length vars"
     using card_regions_all_le by simp
@@ -649,7 +645,7 @@ proof -
 
   (* preservation of truth under restriction to D *)
   have "eval_formula \<sigma> \<iota> \<phi> = eval_formula \<sigma>' \<iota> \<phi>"
-    using formula_preserved_by_support
+      using formula_preserved_by_support
     by (simp add: C_def D_def \<sigma>'_def vars_list_def)
   with sat show "eval_formula \<sigma>' \<iota> \<phi>" by simp
 
