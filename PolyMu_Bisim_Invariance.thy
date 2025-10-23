@@ -99,8 +99,7 @@ next
   then show ?case by (simp add: env_le_def)
 next
   case (pos_And X \<phi> \<psi>)
-  then show ?case
-    by fastforce 
+  then show ?case by fastforce 
 next
   case (pos_Dia X \<phi> i a)
   then show ?case by (auto simp: move_i_def)
@@ -223,8 +222,7 @@ proof (rule monoI)
   then have "\<rho>(X := A) \<sqsubseteq> \<rho>(X := B)"
     by (simp add: env_le_def)
   then show "eval M (\<rho>(X := A)) \<phi> \<subseteq> eval M (\<rho>(X := B)) \<phi>"
-    using eval_mono_env[OF assms]
-    by blast 
+    using eval_mono_env[OF assms] by blast 
 qed
 
 text \<open>Product bisimulation between models M and N relates tuples component-wise
@@ -298,63 +296,59 @@ case (Var X)
   then show ?case by simp 
 next
   case (Dia i a \<phi>)
-  then show ?case sorry
-(* proof -
-  assume "s \<in> eval M \<rho> (Dia i a \<phi>)"
-  then obtain u where u_def:
-    "u \<in> eval M \<rho> \<phi>" "\<exists>u'. u' \<in> move_i M a i s \<and> u' = u"
-    by auto
-  from Dia.prems forth[of s t i] obtain t' where
-    t'_step: "t' \<in> step N (t i) a" and
-    rel: "(s(i := u i), t(i := t')) \<in> R"
-    using u_def(2) move_i_def by (metis (no_types, lifting) UNIV_I mem_Collect_eq)
+  show ?case 
+  proof (rule iffI)
+    (* \<rightarrow> direction *)
+    assume "s \<in> eval M \<rho> (Dia i a \<phi>)"
+    then obtain u where u\<phi>: "u \<in> eval M \<rho> \<phi>" and umv: "u \<in> move_i M a i s"
+      by auto
+    
+    from Dia.prems(1) forth umv
+    obtain t' where tstep: "t' \<in> step N (t i) a"
+                  and rel:   "(s(i := u i), t(i := t')) \<in> R"
+      by (metis (no_types, lifting) iso_tuple_UNIV_I mem_Collect_eq
+          move_i_def)
+    
+    from Dia.IH
+    have "s(i := u i) \<in> eval M \<rho> \<phi> \<longleftrightarrow> t(i := t') \<in> eval N (lift_env \<rho>) \<phi>"
+      using Dia.prems(2) rel by presburger 
+    from umv have u_eq: "u = s(i := u i)"
+      using move_i_def by fastforce
+    with u\<phi> have "s(i := u i) \<in> eval M \<rho> \<phi>"
+      by simp
+    then have "t(i := t') \<in> eval N (lift_env \<rho>) \<phi>"
+      using \<open>s(i := u i) \<in> eval M \<rho> \<phi> 
+        \<longleftrightarrow> t(i := t') \<in> eval N (lift_env \<rho>) \<phi>\<close> by blast
+    moreover have "t(i := t') \<in> move_i N a i t"
+      using tstep by (auto simp: move_i_def)
+    ultimately show "t \<in> eval N (lift_env \<rho>) (Dia i a \<phi>)"
+      by auto
+  next
+    (* \<leftarrow> direction *)
+    assume "t \<in> eval N (lift_env \<rho>) (Dia i a \<phi>)"
+    then obtain v where v\<phi>: "v \<in> eval N (lift_env \<rho>) \<phi>"
+                    and vmv: "v \<in> move_i N a i t"
+      by auto
+    from vmv have vshape: "(\<forall>j. j \<noteq> i \<longrightarrow> v j = t j)" 
+                    and vstep: "v i \<in> step N (t i) a"
+      by (auto simp: move_i_def)
 
-  (* By IH, the related update satisfies \<phi> on the N-side *)
-  obtain u' where umove: "u' \<in> move_i M a i s" "u' = u"
-    using u_def(2) by blast
-  then have u_move: "u \<in> move_i M a i s" by simp
+    from Dia.prems(1) backk vstep
+    obtain s_i where sstep: "s_i \<in> step M (s i) a"
+                and rel2:  "(s(i := s_i), t(i := v i)) \<in> R"
+      by blast
 
-  have u_eq: "s(i := u i) = u"
-    using u_move unfolding move_i_def by auto
-
-  from Dia.IH[OF rel, of \<rho>]
-  have eqv: "(s(i := u i) \<in> eval M \<rho> \<phi>) = (t(i := t') \<in> eval N (lift_env \<rho>) \<phi>)"
-    using Dia.prems(2) by blast 
-
-  have t_eval: "t(i := t') \<in> eval N (lift_env \<rho>) \<phi>"
-    using eqv u_def(1) u_eq by simp
-
-  (* And the updated tuple is exactly a one-step i-move from t *)
-  have t_move: "t(i := t') \<in> move_i N a i t"
-    using t'_step by (auto simp: move_i_def)
-
-  (* Package both facts to witness the diamond on the N-side *)
-  have "\<exists>v\<in>eval N (lift_env \<rho>) \<phi>. \<exists>w\<in>move_i N a i t. w = v"
-    using t_eval t_move by (intro bexI[of _ "t(i := t')"]) auto
-  then show "t \<in> eval N (lift_env \<rho>) (Dia i a \<phi>)" by auto
-next
-  (* the reverse direction is your other subcase *)
-  assume "t \<in> eval N (lift_env \<rho>) (Dia i a \<phi>)"
-  then obtain v where v_def:
-    "v \<in> eval N (lift_env \<rho>) \<phi>" "\<exists>w\<in>move_i N a i t. w = v"
-    by auto
-  then obtain vstep where vstep:
-    "(\<forall>j. j \<noteq> i \<longrightarrow> v j = t j)" "v i \<in> step N (t i) a"
-    using move_i_def by fastforce
-  have v_eq: "v = t(i := v i)"
-    using vstep(1) by (intro ext) (auto)
-  have vin: "t(i := v i) \<in> eval N (lift_env \<rho>) \<phi>"
-    using v_def(1) v_eq by simp
-  from Dia.prems backk[of s t i] obtain s_i where
-    s_i_step: "s_i \<in> step M (s i) a" and
-    rel2: "(s(i := s_i), t(i := v i)) \<in> R"
-    using vstep(2) by blast
-  from IH[OF rel2, of \<rho>] vin
-  have "(s(i := s_i)) \<in> eval M \<rho> \<phi>" by simp
-  then have "\<exists>u\<in>eval M \<rho> \<phi>. \<exists>u'\<in>move_i M a i s. u' = u"
-    using s_i_step move_i_def by fastforce 
-  then show "s \<in> eval M \<rho> (Dia i a \<phi>)" by auto
-qed *)
+    from Dia.IH
+    have "s(i := s_i) \<in> eval M \<rho> \<phi> \<longleftrightarrow> t(i := v i) \<in> eval N (lift_env \<rho>) \<phi>"
+      using Dia.prems(2) rel2 by blast 
+    then have "s(i := s_i) \<in> eval M \<rho> \<phi>"
+      using v\<phi> vshape
+      by (metis (no_types, lifting) ext fun_upd_other fun_upd_same) 
+    moreover have "s(i := s_i) \<in> move_i M a i s"
+      using sstep by (auto simp: move_i_def)
+    ultimately show "s \<in> eval M \<rho> (Dia i a \<phi>)"
+      by auto
+  qed
 next
   case (Perm \<pi> \<phi>)
   then show ?case sorry
