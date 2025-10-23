@@ -261,6 +261,9 @@ definition R_closed :: "(('\<iota> \<Rightarrow> 's) set) \<Rightarrow> bool" wh
 definition env_R_closed :: "('\<iota>,'s,'var) env \<Rightarrow> bool" where
   "env_R_closed \<rho> \<longleftrightarrow> (\<forall>X. R_closed (\<rho> X))"
 
+lemma perm: "(s,t)\<in>R \<Longrightarrow> (perm_tup \<pi> s, perm_tup \<pi> t)\<in>R"
+  by (simp add: perm_closed)
+
 lemma preservation:
   assumes "(s,t)\<in>R" and "env_R_closed \<rho>"
   shows "(s \<in> eval M \<rho> \<phi>) \<longleftrightarrow> (t \<in> eval N (lift_env \<rho>) \<phi>)"
@@ -351,7 +354,13 @@ next
   qed
 next
   case (Perm \<pi> \<phi>)
-  then show ?case sorry
+  (* R is closed under permuting coordinates *)
+  have rel\<pi>: "(perm_tup \<pi> s, perm_tup \<pi> t) \<in> R"
+    using Perm.prems(1) by (rule perm) 
+  from Perm.IH
+  have "perm_tup \<pi> s \<in> eval M \<rho> \<phi> \<longleftrightarrow> perm_tup \<pi> t \<in> eval N (lift_env \<rho>) \<phi>"
+    using Perm.prems(2) rel\<pi> by blast 
+  then show ?case by simp
 next 
   case (Mu X \<phi>)
   then show ?case sorry
@@ -362,9 +371,9 @@ qed
 
 text \<open>Main theorem: bisimulation invariance for closed formulas\<close>
 theorem bisim_invariance_closed:
-  assumes "(s,t)\<in>R"
+  assumes "(s,t)\<in>R" 
   shows "(s \<in> eval M (\<lambda>_. {}) \<phi>) = (t \<in> eval N (\<lambda>_. {}) \<phi>)"
-  using preservation[OF assms, of "\<lambda>_. {}" \<phi>] sorry
+  using preservation[OF assms, of "\<lambda>_. {}" \<phi>] 
 
 end  (* locale prod_bisim *)
 
