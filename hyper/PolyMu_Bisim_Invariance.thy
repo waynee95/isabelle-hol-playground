@@ -336,6 +336,248 @@ next
   then show ?case by simp
 qed
 
+lemma (in prod_bisim) eval_agreement:
+  fixes v :: "'\<iota> \<Rightarrow> 't"
+  defines "Range_R \<equiv> {z. \<exists>w. (w,z) \<in> R}"
+  assumes "(u,v) \<in> R"
+      and "pos X \<phi>"
+      and agree_env: "\<forall>Y. \<forall>z \<in> Range_R. z \<in> \<rho>1 Y \<longleftrightarrow> z \<in> \<rho>2 Y"
+  shows "v \<in> eval N \<rho>1 \<phi> \<longleftrightarrow> v \<in> eval N \<rho>2 \<phi>"
+  using assms
+proof (induction \<phi> arbitrary: u v \<rho>1 \<rho>2)
+  case (Atom i p) 
+  then show ?case using atoms by auto
+next
+  case (Var Y)
+  show ?case
+    using Range_R_def Var.prems(1,3) by auto 
+next
+  case (And \<phi>1 \<phi>2) 
+  then show ?case using pos_And_inv1 pos_And_inv2
+    by (smt (verit, best) Int_iff eval.simps(3))
+  
+next
+  case (Not \<phi>) 
+  then show ?case using pos_NotE by fastforce
+next
+  case (Dia i a \<phi>')
+  show ?case
+  proof
+    \<comment> \<open>Direction 1: \<rho>1 \<Longrightarrow> \<rho>2\<close>
+    assume "v \<in> eval N \<rho>1 (Dia i a \<phi>')"
+    \<comment> \<open>Obtain the successor tuple v_next\<close>
+    then obtain v_next where v_next_in: "v_next \<in> eval N \<rho>1 \<phi>'" 
+                         and v_move: "v_next \<in> move_i N a i v" 
+      by auto
+      
+    \<comment> \<open>Extract the state step at index i\<close>
+    let ?v'_state = "v_next i"
+    have step_N: "?v'_state \<in> step N (v i) a" 
+      using v_move move_i_def by fastforce
+      
+    \<comment> \<open>Use backward simulation to find matching u' state\<close>
+    have "(u,v) \<in> R" using Dia.prems(1) .
+    from backk[OF this, of i] step_N
+    obtain u'_state where 
+      step_M: "u'_state \<in> step M (u i) a" and
+      R_next: "(u(i := u'_state), v(i := ?v'_state)) \<in> R"
+      by blast
+
+    \<comment> \<open>Reconstruct the tuple relation\<close>
+    let ?u_next = "u(i := u'_state)"
+    
+    \<comment> \<open>Verify v_next is exactly the update of v at i\<close>
+    have v_next_eq: "v_next = v(i := ?v'_state)" 
+      using v_move move_i_def by fastforce
+      
+    have R_tuple: "(?u_next, v_next) \<in> R"
+      using R_next v_next_eq by simp
+      
+    \<comment> \<open>Apply Induction Hypothesis to the tuple v_next\<close>
+    have "pos X \<phi>'" using Dia.prems(2) pos_Dia_inv
+      by fastforce 
+    then have "v_next \<in> eval N \<rho>1 \<phi>' \<longleftrightarrow> v_next \<in> eval N \<rho>2 \<phi>'"
+      using R_tuple Dia.prems
+      by (simp add: Dia.hyps(1,2))
+      
+    then have "v_next \<in> eval N \<rho>2 \<phi>'" using v_next_in by simp
+    
+    \<comment> \<open>Witness the Dia in \<rho>2\<close>
+    then show "v \<in> eval N \<rho>2 (Dia i a \<phi>')"
+      using v_move by auto
+  next
+   \<comment> \<open>Direction 2: \<rho>2 \<Longrightarrow> \<rho>1 (Symmetric)\<close>
+    assume "v \<in> eval N \<rho>2 (Dia i a \<phi>')"
+    then obtain v_next where v_next_in: "v_next \<in> eval N \<rho>2 \<phi>'" 
+                         and v_move: "v_next \<in> move_i N a i v" 
+      by auto
+      
+    let ?v'_state = "v_next i"
+    have step_N: "?v'_state \<in> step N (v i) a" 
+      using v_move move_i_def by fastforce
+      
+    have "(u,v) \<in> R" using Dia.prems(1) .
+    from backk[OF this, of i] step_N
+    obtain u'_state where 
+      step_M: "u'_state \<in> step M (u i) a" and
+      R_next: "(u(i := u'_state), v(i := ?v'_state)) \<in> R"
+      by blast
+
+    have v_next_eq: "v_next = v(i := ?v'_state)" 
+      using v_move move_i_def by fastforce
+      
+    let ?u_next = "u(i := u'_state)"
+    have R_tuple: "(?u_next, v_next) \<in> R"
+      using R_next v_next_eq by simp
+      
+    have "pos X \<phi>'" using Dia.prems(2) pos_Dia_inv
+      by fastforce 
+    then have "v_next \<in> eval N \<rho>1 \<phi>' \<longleftrightarrow> v_next \<in> eval N \<rho>2 \<phi>'"
+      using R_tuple Dia.prems
+      by (simp add: Dia.hyps(1,2))
+      
+    then have "v_next \<in> eval N \<rho>1 \<phi>'" using v_next_in by simp
+    then show "v \<in> eval N \<rho>1 (Dia i a \<phi>')"
+      using v_move by auto
+  qed
+next
+  case (Perm \<pi> \<phi>')
+  have R_perm: "(perm_tup \<pi> u, perm_tup \<pi> v) \<in> R" using perm_closed Perm.prems(1) by blast
+  then show ?case 
+    using  Perm.prems(2) agree_env pos_Perm_inv sorry
+next
+  case (Mu Y \<phi>')
+  let ?F1 = "\<lambda>S. eval N (\<rho>1(Y := S)) \<phi>'"
+  let ?F2 = "\<lambda>S. eval N (\<rho>2(Y := S)) \<phi>'"
+  
+  have pos_body: "pos X \<phi>'" using Mu.prems(2) by (auto elim: pos.cases)
+
+  \<comment> \<open>Step 1: The semantic functions agree on Range_R\<close>
+  have F_agree: "?F1 S \<inter> Range_R = ?F2 S \<inter> Range_R" for S
+  proof -
+    have "\<forall>z\<in>Range_R. z \<in> ?F1 S \<longleftrightarrow> z \<in> ?F2 S"
+    proof
+      fix z assume z_in: "z \<in> Range_R"
+      then obtain w where wz: "(w,z) \<in> R" unfolding Range_R_def by auto
+      
+      \<comment> \<open>Check that updated environments still satisfy the agreement assumption\<close>
+      have new_agree: "\<forall>V. \<forall>k \<in> Range_R. k \<in> (\<rho>1(Y:=S)) V \<longleftrightarrow> k \<in> (\<rho>2(Y:=S)) V"
+      proof (intro allI ballI)
+        fix V k assume k_range: "k \<in> Range_R"
+        show "k \<in> (\<rho>1(Y:=S)) V \<longleftrightarrow> k \<in> (\<rho>2(Y:=S)) V"
+          using agree_env k_range
+          by (simp add: Mu.prems(3)) 
+      qed
+      
+      show "z \<in> ?F1 S \<longleftrightarrow> z \<in> ?F2 S"
+        using Mu.hyps(1) Range_R_def new_agree pos_body wz by blast
+    qed
+    then show ?thesis by auto
+  qed
+
+  \<comment> \<open>Step 2: Compare LFPs\<close>
+  have "v \<in> lfp ?F1 \<longleftrightarrow> v \<in> lfp ?F2"
+  proof
+    assume "v \<in> lfp ?F1"
+    have "lfp ?F1 \<inter> Range_R \<subseteq> lfp ?F2"
+    proof -
+      have mono_F2: "mono ?F2" using mono_eval_in_var[OF pos_body]
+        by (metis (no_types, lifting) env_le_update eval_mono_env monoI pos_body) 
+      let ?U = "lfp ?F2 \<union> - Range_R"
+      
+      have "?F1 ?U \<subseteq> ?U"
+      proof -
+        have "?F1 ?U \<inter> Range_R = ?F2 ?U \<inter> Range_R" using F_agree by blast
+        also have "... = ?F2 (lfp ?F2) \<inter> Range_R" 
+        proof -
+          \<comment> \<open>Crucial Step: Check agreement of ?U and lfp ?F2 on Range_R\<close>
+          have U_agree: "\<forall>V. \<forall>k\<in>Range_R. k \<in> (\<rho>2(Y:=?U)) V \<longleftrightarrow> k \<in> (\<rho>2(Y:=lfp ?F2)) V"
+          proof (intro allI ballI)
+            fix V k assume k_in: "k \<in> Range_R"
+            show "k \<in> (\<rho>2(Y:=?U)) V \<longleftrightarrow> k \<in> (\<rho>2(Y:=lfp ?F2)) V"
+            proof (cases "V=Y")
+              case True
+              \<comment> \<open>At Y, ?U and lfp ?F2 agree because k is in Range_R\<close>
+              have "k \<in> ?U \<longleftrightarrow> k \<in> lfp ?F2" using k_in by auto
+              then show ?thesis using True by simp
+            next
+              case False
+              then show ?thesis by simp
+            qed
+          qed
+          
+          \<comment> \<open>Apply IH to show eval results are identical\<close>
+          \<comment> \<open>We use an arbitrary pair (u,v) in R just to trigger the IH type, \<close>
+          \<comment> \<open>but effectively we quantify over z in Range_R inside the set equality\<close>
+          have "\<forall>z\<in>Range_R. z \<in> ?F2 ?U \<longleftrightarrow> z \<in> ?F2 (lfp ?F2)"
+          proof
+            fix z assume z_in: "z \<in> Range_R"
+            then obtain w where wz: "(w,z) \<in> R" unfolding Range_R_def by auto
+            show "z \<in> ?F2 ?U \<longleftrightarrow> z \<in> ?F2 (lfp ?F2)"
+              using Mu.hyps(1) Range_R_def U_agree pos_body wz by blast
+             
+          qed
+          then show ?thesis by auto
+        qed
+        also have "... = lfp ?F2 \<inter> Range_R" using lfp_unfold[OF mono_F2] by simp
+        finally have "?F1 ?U \<inter> Range_R \<subseteq> lfp ?F2" by auto
+        then show ?thesis by auto
+      qed
+      
+      have "lfp ?F1 \<subseteq> ?U" using lfp_lowerbound
+        by (metis
+            \<open>eval N (\<rho>1 (Y := lfp (\<lambda>S. eval N (\<rho>2(Y := S)) \<phi>') \<union> - Range_R)) \<phi>' \<subseteq> lfp (\<lambda>S. eval N (\<rho>2(Y := S)) \<phi>') \<union> - Range_R\<close>) 
+      then show ?thesis by auto
+    qed 
+    then show "v \<in> lfp ?F2" using \<open>v \<in> lfp ?F1\<close> Mu.prems(1) Range_R_def by auto
+  next
+    assume "v \<in> lfp ?F2"
+    have "lfp ?F2 \<inter> Range_R \<subseteq> lfp ?F1"
+    proof -
+      \<comment> \<open>Symmetric argument\<close>
+      have mono_F1: "mono ?F1" using mono_eval_in_var[OF pos_body]
+        by (metis (no_types, lifting) env_le_update eval_mono_env monoI pos_body) 
+      let ?U = "lfp ?F1 \<union> - Range_R"
+      
+      have "?F2 ?U \<subseteq> ?U"
+      proof -
+        have "?F2 ?U \<inter> Range_R = ?F1 ?U \<inter> Range_R" using F_agree by auto
+        also have "... = ?F1 (lfp ?F1) \<inter> Range_R" 
+        proof -
+          have U_agree: "\<forall>V. \<forall>k\<in>Range_R. k \<in> (\<rho>1(Y:=?U)) V \<longleftrightarrow> k \<in> (\<rho>1(Y:=lfp ?F1)) V"
+          proof (intro allI ballI)
+            fix V k assume k_in: "k \<in> Range_R"
+            show "k \<in> (\<rho>1(Y:=?U)) V \<longleftrightarrow> k \<in> (\<rho>1(Y:=lfp ?F1)) V"
+              using k_in by (cases "V=Y") auto
+          qed
+          have "\<forall>z\<in>Range_R. z \<in> ?F1 ?U \<longleftrightarrow> z \<in> ?F1 (lfp ?F1)"
+          proof
+            fix z assume z_in: "z \<in> Range_R"
+            then obtain w where wz: "(w,z) \<in> R" unfolding Range_R_def by auto
+            show "z \<in> ?F1 ?U \<longleftrightarrow> z \<in> ?F1 (lfp ?F1)"
+              using Mu.hyps(1) Range_R_def U_agree pos_body wz by blast
+             
+          qed
+          then show ?thesis by auto
+        qed
+        also have "... = lfp ?F1 \<inter> Range_R" using lfp_unfold[OF mono_F1] by simp
+        finally have "?F2 ?U \<inter> Range_R \<subseteq> lfp ?F1" by auto
+        then show ?thesis by auto
+      qed
+      
+      have "lfp ?F2 \<subseteq> ?U" using lfp_lowerbound
+        by (metis
+            \<open>eval N (\<rho>2 (Y := lfp (\<lambda>S. eval N (\<rho>1(Y := S)) \<phi>') \<union> - Range_R)) \<phi>' \<subseteq> lfp (\<lambda>S. eval N (\<rho>1(Y := S)) \<phi>') \<union> - Range_R\<close>) 
+      then show ?thesis by auto
+    qed
+    then show "v \<in> lfp ?F1" using \<open>v \<in> lfp ?F2\<close> Mu.prems(1) Range_R_def by auto
+  qed
+  then show ?case by simp
+next
+  case (Nu Y \<phi>')
+  then show ?case sorry
+qed
+
 (* preservation lemma *)
 lemma preservation:
   assumes "(s,t)\<in>R" and "env_R_closed \<rho>" and "pos X \<phi>"
@@ -477,8 +719,8 @@ next
     then have "\<rho>(Y := S) \<sqsubseteq> \<rho>(Y := T)" for Y
       by (simp add: env_le_update) 
     then have "eval M (\<rho>(Y := S)) \<phi> \<subseteq> eval M (\<rho>(Y := T)) \<phi>" for Y
-      by (smt (verit, best) Mu.prems(3) eval_mono_env pfml.distinct(11,33,47,51,55)
-          pfml.inject(7) pfml.simps(50) pos.cases)
+      by (smt (verit) Mu.prems(3) eval_mono_env in_mono pfml.distinct(33) pfml.inject(7)
+          pfml.simps(20,50,56,60,64) pos.simps)
     then show "F S \<subseteq> F T" unfolding F_def by simp
   qed
 
@@ -552,10 +794,54 @@ next
     have IHn: "(w,z)\<in>R \<Longrightarrow> (w \<in> appr F n \<longleftrightarrow> z \<in> appr' G n)" for w z 
       using Suc.IH by blast 
     have "u \<in> appr F (Suc n) \<longleftrightarrow> u \<in> F (appr F n)" 
-      by simp also have "... \<longleftrightarrow> v \<in> G (appr' G n)" 
+      by simp 
+    also have "... \<longleftrightarrow> v \<in> G (appr' G n)" 
     proof - 
       have PRES_\<phi>: "u \<in> eval M (\<rho>(X := appr F n)) \<phi> \<longleftrightarrow> v \<in> eval N ((lift_env \<rho>)(X := appr' G n)) \<phi>" 
-        sorry 
+      proof -
+        let ?S = "appr F n"
+        let ?T = "appr' G n"
+      
+        \<comment> \<open>1. Establish the relationship between the projected set S and T using IHn\<close>
+        have "lift_set ?S \<subseteq> ?T" 
+          using IHn by (auto simp: lift_set_def)
+        then have env_le: "(lift_env \<rho>)(X := lift_set ?S) \<sqsubseteq> (lift_env \<rho>)(X := ?T)"
+          by (rule env_le_update)
+  
+        \<comment> \<open>2. Use the outer IH to bridge M and N using lift_set\<close>
+        have closed_S: "R_closed ?S" using appr_closed[of n] .
+        have bridge: "u \<in> eval M (\<rho>(X := ?S)) \<phi> \<longleftrightarrow> v \<in> eval N ((lift_env \<rho>)(X := lift_set ?S)) \<phi>"
+          using Mu.IH lift_env_update Mu.prems(3)
+          by (metis IH_upd Suc.prems closed_S) 
+       
+        have "v \<in> eval N ((lift_env \<rho>)(X := lift_set ?S)) \<phi> \<longleftrightarrow> v \<in> eval N ((lift_env \<rho>)(X := ?T)) \<phi>"
+proof (rule eval_agreement)
+      show "(u,v) \<in> R" using uv .
+      show "pos X \<phi>" using Mu.prems(3) by (auto elim: pos.cases)
+
+      \<comment> \<open>New unified agreement check\<close>
+      let ?Range_R = "{z. \<exists>w. (w, z) \<in> R}"
+      show "\<forall>Y. \<forall>z\<in>?Range_R. z \<in> ((lift_env \<rho>)(X := lift_set ?S)) Y \<longleftrightarrow> z \<in> ((lift_env \<rho>)(X := ?T)) Y"
+      proof (intro allI ballI)
+        fix Y z assume z_in: "z \<in> ?Range_R"
+        show "z \<in> ((lift_env \<rho>)(X := lift_set ?S)) Y \<longleftrightarrow> z \<in> ((lift_env \<rho>)(X := ?T)) Y"
+        proof (cases "Y = X")
+          case True
+          \<comment> \<open>Use IHn for X\<close>
+          have "z \<in> lift_set ?S \<longleftrightarrow> z \<in> ?T" 
+            using IHn z_in unfolding lift_set_def
+            using lift_set_def by auto
+          then show ?thesis using True by simp
+        next
+          case False
+          \<comment> \<open>Identity for others\<close>
+          then show ?thesis by simp
+        qed
+      qed
+    qed
+      then show ?thesis
+        using bridge by simp
+    qed
       then show ?thesis 
         unfolding F_def G_def by blast 
     qed 
@@ -567,14 +853,13 @@ next
   proof 
     fix u assume "u \<in> F (\<Union>n. appr F n)" 
     then obtain n where "u \<in> F (appr F n)" 
-      using mono_F sorry 
+      using mono_F  
+      sorry
     thus "u \<in> (\<Union>n. appr F n)" 
       by (metis UNIV_I UN_I appr_Suc) 
   qed 
   have appr_le_lfp: "appr F n \<subseteq> lfp F" for n 
-    apply (induction n) 
-     apply simp 
-    by (metis lfp_fixpoint mono_F monotoneD prod_bisim.appr_Suc prod_bisim_axioms) 
+      by (induction n) (simp, metis appr_Suc lfp_unfold monoD mono_F)
   have lfpF_eq: "lfp F = (\<Union>n. appr F n)" 
   proof (rule antisym) 
     show "lfp F \<subseteq> (\<Union>n. appr F n)" 
@@ -590,14 +875,13 @@ next
   have appr'_pre_fix: "G (\<Union>n. appr' G n) \<subseteq> (\<Union>n. appr' G n)" 
   proof fix v assume "v \<in> G (\<Union>n. appr' G n)" 
     then obtain n where "v \<in> G (appr' G n)" 
-      using mono_G sorry 
+      using mono_G  
+      sorry
     thus "v \<in> (\<Union>n. appr' G n)" 
       by (metis UNIV_I UN_iff appr'_Suc) 
   qed 
   have appr'_le_lfp: "appr' G n \<subseteq> lfp G" for n 
-    apply (induction n) 
-     apply simp 
-    by (metis lfp_fixpoint mono_G monotoneD prod_bisim.appr'_Suc prod_bisim_axioms) 
+    by (induction n) (simp, metis lfp_fixpoint mono_G monotoneD prod_bisim.appr'_Suc prod_bisim_axioms) 
   
   have lfpG_eq: "lfp G = (\<Union>n. appr' G n)" 
   proof (rule antisym) 
@@ -626,6 +910,7 @@ theorem bisim_invariance_closed:
   assumes "(s,t)\<in>R" 
   shows "(s \<in> eval M (\<lambda>_. {}) \<phi>) = (t \<in> eval N (\<lambda>_. {}) \<phi>)"
   using preservation[OF assms, of "\<lambda>_. {}" \<phi>] 
+  sorry
 
 end  (* locale prod_bisim *)
 

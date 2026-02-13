@@ -409,7 +409,7 @@ next
 
     then show "sem T E (f i) (Until \<phi>1 \<phi>2)"
       using \<open>sem T E ?K \<phi>2\<close> \<open>k_prime \<ge> i\<close> assms is_stutter_fn_def mono_def
-        by (smt (verit) sem.simps(4))
+      by (metis (no_types, lifting) sem.simps(4)) 
   qed
 qed
 
@@ -484,7 +484,6 @@ definition "phi_example = Exists ''pi'' (Until (Atom ''pi'' a) (Atom ''pi'' b))"
 theorem example_stutter_equivalence:
   "(Sys_Simple \<Turnstile> phi_example) \<longleftrightarrow> (stretch_sys f_double Sys_Simple \<Turnstile> phi_example)"
 proof -
-  (* This follows directly from our main theorem *)
   have "is_stutter_fn f_double" using f_double_is_stutter .
   moreover have "closed phi_example"
     unfolding phi_example_def closed_def by simp
@@ -501,10 +500,9 @@ proof (intro conjI)
     unfolding phi_example_def closed_def by simp
 next
   (* 2. Show Validity for any environment *)
-  (* Change 'have' to 'show' to target the goal directly *)
   show "\<forall>E. sem Sys_Simple E 0 phi_example"
-    by (smt (verit, best) One_nat_def Sys_Simple_def fun_upd_same insertI1 less_Suc0 nat.simps(3)
-        phi_example_def sem.simps(1,4,5) trace_simple_def zero_le_one)
+    unfolding Sys_Simple_def phi_example_def trace_simple_def
+    by auto
 qed
 
 end
